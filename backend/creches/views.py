@@ -255,6 +255,12 @@ class AdminEmployeeTimeView(APIView):
             if len(arrivees) == 1 and len(departs) == 1:
                 delta = departs[0].horodatage - arrivees[0].horodatage
                 worked_minutes = delta.total_seconds() / 60
+                
+                if schedule_map:
+                    scheduled_pause = _schedule_pause_minutes(schedule_map, day_date)
+                    worked_minutes -= scheduled_pause
+                    worked_minutes = max(worked_minutes, 0)
+                
                 is_complete = True
 
             if schedule_map:
