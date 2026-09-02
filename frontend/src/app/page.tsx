@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { login, ApiError } from "@/lib/api";
 
@@ -8,25 +8,30 @@ export default function LoginPage() {
   const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
+    setError("");
     setLoading(true);
+
     try {
-      await login(username, password);
-      router.push("/emargement");
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setError(
-          err.status === 401
-            ? "Identifiant ou mot de passe incorrect."
-            : "Impossible de se connecter. Vérifiez que le serveur est lancé."
-        );
+      const response = await login(username, password);
+      
+      // Redirection based on role
+      if (response.role === "ADMIN") {
+        router.push("/admin/dashboard");
+      } else if (response.role === "CRECHE") {
+        router.push("/tablet");
       } else {
-        setError("Impossible de se connecter. Vérifiez que le serveur est lancé.");
+        setError("Rôle non reconnu");
+      }
+    } catch (err: any) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError("Erreur lors de la connexion");
       }
     } finally {
       setLoading(false);
@@ -34,64 +39,64 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="flex flex-1 items-center justify-center px-6 py-12">
-      <div className="w-full max-w-[440px]">
-        <div className="mb-8 text-center">
-          <h1 className="font-display text-[2.25rem] font-semibold leading-tight text-primary">
-            Mini Crèche
-          </h1>
-          <p className="mt-2 text-muted">
-            Connexion de la tablette à votre crèche
-          </p>
-        </div>
-
-        <form
-          onSubmit={handleSubmit}
-          className="rounded-2xl border border-border bg-surface p-8 shadow-[0_1px_2px_rgba(34,40,31,0.06),0_8px_24px_rgba(34,40,31,0.06)]"
-        >
-          <div className="flex flex-col gap-5">
-            <label className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-ink">Identifiant</span>
-              <input
-                type="text"
-                autoComplete="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-                className="h-14 rounded-xl border border-border bg-white px-4 text-base text-ink outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/30"
-                placeholder="creche_dupont"
-              />
-            </label>
-
-            <label className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-ink">Mot de passe</span>
-              <input
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="h-14 rounded-xl border border-border bg-white px-4 text-base text-ink outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/30"
-                placeholder="••••••••"
-              />
-            </label>
-
-            {error && (
-              <p className="rounded-lg bg-error/10 px-4 py-3 text-sm text-error">
-                {error}
-              </p>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="mt-2 h-14 rounded-xl bg-primary text-base font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
-            >
-              {loading ? "Connexion..." : "Se connecter"}
-            </button>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50">
+      <main className="w-full max-w-md p-8 bg-white shadow-xl rounded-2xl border border-slate-100">
+        <div className="flex justify-center mb-6">
+          <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-3xl shadow-sm">
+            🏢
           </div>
+        </div>
+        <h1 className="text-2xl font-bold text-slate-800 mb-2 text-center">
+          Connexion
+        </h1>
+        <p className="text-slate-500 text-center mb-8 text-sm">
+          Connectez-vous en tant que crèche ou administratrice.
+        </p>
+
+        {error && (
+          <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-6 text-sm text-center border border-red-100">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Identifiant
+            </label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-colors"
+              placeholder="Nom de la crèche"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Mot de passe
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-colors"
+              placeholder="••••••••"
+              required
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-3.5 bg-blue-600 text-white rounded-xl font-semibold mt-2 hover:bg-blue-700 focus:ring-4 focus:ring-blue-100 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {loading ? "Connexion en cours..." : "Se connecter"}
+          </button>
         </form>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

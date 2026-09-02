@@ -3,7 +3,8 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 type LoginResponse = {
   access: string;
   refresh: string;
-  creche: { id: string; nom: string };
+  role: string;
+  creche?: { id: string; nom: string };
 };
 
 export class ApiError extends Error {
@@ -29,7 +30,10 @@ export async function login(username: string, password: string): Promise<LoginRe
 
   localStorage.setItem("access_token", data.access);
   localStorage.setItem("refresh_token", data.refresh);
-  localStorage.setItem("creche", JSON.stringify(data.creche));
+  localStorage.setItem("role", data.role);
+  if (data.creche) {
+    localStorage.setItem("creche", JSON.stringify(data.creche));
+  }
 
   return data;
 }
@@ -49,6 +53,7 @@ export function logout() {
   localStorage.removeItem("access_token");
   localStorage.removeItem("refresh_token");
   localStorage.removeItem("creche");
+  localStorage.removeItem("role");
 }
 
 export async function apiFetch(path: string, options: RequestInit = {}) {
