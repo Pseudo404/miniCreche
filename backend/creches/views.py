@@ -194,21 +194,49 @@ class AdminEmployeeEmargementView(APIView):
         month = int(request.query_params.get('month', timezone.now().month))
         year  = int(request.query_params.get('year',  timezone.now().year))
 
+        try:
+            employee = Employee.objects.get(id=employee_id)
+        except Employee.DoesNotExist:
+            return Response(status=404)
+
+        schedule_map = {s.jour: s for s in employee.schedules.all()}
+
+        # Order by horodatage ASC (anciennes à gauche, nouvelles à droite)
         emargements = Emargement.objects.filter(
             employee_id=employee_id,
             horodatage__year=year,
             horodatage__month=month
-        ).order_by('-horodatage')
+        ).order_by('horodatage')
 
-        data = [
-            {
+        data = []
+        for e in emargements:
+            local_time = e.horodatage.astimezone(timezone.get_current_timezone())
+            dow = local_time.weekday()
+            sched = schedule_map.get(dow)
+
+            expected_time = None
+            delay_minutes = None
+
+            if sched:
+                if e.type_event == "ARRIVEE":
+                    expected_time = sched.matin_debut or sched.aprem_debut
+                elif e.type_event == "DEPART":
+                    expected_time = sched.aprem_fin or sched.matin_fin
+
+                if expected_time:
+                    exp_dt = timezone.make_aware(datetime.combine(local_time.date(), expected_time))
+                    delay_minutes = (local_time - exp_dt).total_seconds() / 60
+
+
+            data.append({
                 "id": str(e.id),
                 "type_event": e.type_event,
                 "horodatage": e.horodatage,
                 "signature": e.signature,
-            }
-            for e in emargements
-        ]
+                "expected_time": expected_time.strftime("%H:%M") if expected_time else None,
+                "delay_minutes": round(delay_minutes) if delay_minutes is not None else None
+            })
+
         return Response(data)
 
 

@@ -33,6 +33,8 @@ type Emargement = {
   type_event: string;
   horodatage: string;
   signature: string;
+  expected_time: string | null;
+  delay_minutes: number | null;
 };
 
 type ScheduleEntry = {
@@ -475,19 +477,48 @@ export default function AdminEmployeeDetail() {
           {/* ── Contrôle des Signatures ───────────────────────────────────── */}
           {activeTab === "signatures" && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {emargements.map((sig) => (
+              {emargements.map((sig) => {
+                let delayColor = "text-slate-700";
+                if (sig.delay_minutes !== null) {
+                  if (sig.type_event === "ARRIVEE") {
+                    // Inverted conditions as requested
+                    if (sig.delay_minutes >= 0) {
+                      delayColor = "text-emerald-600";
+                    } else if (sig.delay_minutes >= -5) {
+                      delayColor = "text-amber-500";
+                    } else {
+                      delayColor = "text-rose-600";
+                    }
+                  } else if (sig.type_event === "DEPART") {
+                    if (sig.delay_minutes >= 0) {
+                      delayColor = "text-emerald-600";
+                    } else if (sig.delay_minutes >= -5) {
+                      delayColor = "text-amber-500";
+                    } else {
+                      delayColor = "text-rose-600";
+                    }
+                  }
+                }
+
+                return (
                 <div
                   key={sig.id}
                   className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col"
                 >
                   <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                    <span className="font-bold text-slate-700 text-sm">
-                      {new Date(sig.horodatage).toLocaleDateString("fr-FR")} à{" "}
-                      {new Date(sig.horodatage).toLocaleTimeString("fr-FR", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
+                    <div>
+                      <div className="text-sm font-bold text-slate-900">
+                        {sig.expected_time 
+                          ? `Prévu : ${new Date(sig.horodatage).toLocaleDateString("fr-FR")} à ${sig.expected_time}`
+                          : new Date(sig.horodatage).toLocaleDateString("fr-FR")}
+                      </div>
+                      <div className={`font-bold text-sm ${delayColor} mt-1`}>
+                        {new Date(sig.horodatage).toLocaleTimeString("fr-FR", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </div>
+                    </div>
                     <span className="text-xs font-bold px-2 py-1 rounded bg-slate-200 text-slate-600">
                       {sig.type_event}
                     </span>
@@ -501,7 +532,7 @@ export default function AdminEmployeeDetail() {
                     />
                   </div>
                 </div>
-              ))}
+              )})}
               {emargements.length === 0 && (
                 <div className="col-span-full text-center py-10 text-slate-500 bg-white rounded-2xl border border-slate-200 shadow-sm">
                   Aucune signature ce mois-ci.
