@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import SignatureCanvas from "react-signature-canvas";
 import { apiFetch } from "@/lib/api";
+import { saveEmargementLocally } from "@/lib/sync";
 
 type Employee = {
   id: string;
@@ -54,24 +55,22 @@ export default function SignPage() {
     setError("");
     setSaving(true);
     
-    // Get base64 PNG
     const signatureBase64 = sigCanvas.current.getTrimmedCanvas().toDataURL("image/png");
 
     try {
-      await apiFetch("/emargements/", {
-        method: "POST",
-        body: JSON.stringify({
-          employee_id: employeeId,
-          type_event: action,
-          signature: signatureBase64,
-        }),
+      await saveEmargementLocally({
+        employee_id: employeeId,
+        employee_name: `${employee?.prenom} ${employee?.nom}`,
+        type_event: action,
+        timestamp: new Date().toISOString(),
+        signature: signatureBase64,
       });
       setSuccess(true);
       setTimeout(() => {
         router.push("/tablet");
       }, 2000);
     } catch (err: any) {
-      setError(err.message || "Erreur lors de l'enregistrement.");
+      setError("Erreur lors de la sauvegarde locale.");
       setSaving(false);
     }
   };

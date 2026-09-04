@@ -16,6 +16,23 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Mini Crèche",
   description: "Émargement et suivi des crèches",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Mini Crèche",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+};
+
+export const viewport = {
+  themeColor: "#ffffff",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false, // Prevents zooming on double tap in PWA
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

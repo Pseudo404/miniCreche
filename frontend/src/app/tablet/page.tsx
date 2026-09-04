@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import { syncEmargements, getPendingCount } from "@/lib/sync";
 
 type Employee = {
   id: string;
@@ -15,14 +16,44 @@ export default function TabletHome() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [pendingSync, setPendingSync] = useState(0);
+
+  useEffect(() => {
+    // Initial fetch of pending count
+    getPendingCount().then(setPendingSync);
+
+    // Auto-sync interval (every 10 seconds)
+    const interval = setInterval(async () => {
+      if (navigator.onLine) {
+        const res = await syncEmargements();
+        setPendingSync(res.pending);
+      }
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const fetchEmployees = async () => {
       try {
-        const data = await apiFetch("/employees/");
-        setEmployees(data);
+        const { get, set } = await import('idb-keyval');
+        const cached = await get('employees_cache');
+        if (cached) {
+          setEmployees(cached);
+          setLoading(false);
+        }
+
+        if (navigator.onLine) {
+          const { getCreche } = await import('@/lib/api');
+          const creche = getCreche();
+          const data = await apiFetch(`/employees/?creche=${creche?.nom || ''}`);
+          setEmployees(data);
+          await set('employees_cache', data);
+        }
       } catch (err: any) {
-        setError("Impossible de charger les employés");
+        if (employees.length === 0) {
+          setError("Impossible de charger les employés (hors-ligne)");
+        }
       } finally {
         setLoading(false);
       }
@@ -40,7 +71,15 @@ export default function TabletHome() {
   }
 
   return (
-    <div className="max-w-4xl w-full mx-auto">
+    <div className="max-w-4xl w-full mx-auto relative">
+      <div className="absolute top-0 right-0 flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-sm text-sm font-medium">
+        {pendingSync === 0 ? (
+          <><span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> À jour</>
+        ) : (
+          <><span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span> {pendingSync} en attente</>
+        )}
+      </div>
+
       <h2 className="text-3xl font-semibold text-slate-800 mb-8 text-center mt-4">
         Qui êtes-vous ?
       </h2>
