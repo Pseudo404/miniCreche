@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import SignatureCanvas from "react-signature-canvas";
 import { apiFetch } from "@/lib/api";
 import { saveEmargementLocally } from "@/lib/sync";
@@ -14,8 +14,8 @@ type Employee = {
 
 export default function SignPage() {
   const router = useRouter();
-  const params = useParams();
-  const employeeId = params.id as string;
+  const searchParams = useSearchParams();
+  const employeeId = searchParams.get("id") || "";
   const sigCanvas = useRef<any>(null);
 
   const [employee, setEmployee] = useState<Employee | null>(null);
@@ -26,11 +26,21 @@ export default function SignPage() {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    // In a real app we'd fetch just this employee, 
+    if (!employeeId) {
+      setError("Employé non sélectionné");
+      setLoading(false);
+      return;
+    }
+    // In a real app we'd fetch just this employee,
     // but we can just fetch all and find them for simplicity
     const fetchEmployee = async () => {
       try {
-        const data: Employee[] = await apiFetch("/employees/");
+        const { get } = await import("idb-keyval");
+        const cached = await get<Employee[]>("employees_cache");
+        const { getCreche } = await import("@/lib/api");
+        const data: Employee[] = cached || await apiFetch(
+          `/employees/?creche=${encodeURIComponent(getCreche()?.nom || "")}`
+        );
         const emp = data.find((e) => e.id === employeeId);
         if (emp) setEmployee(emp);
         else setError("Employé non trouvé");
@@ -70,7 +80,7 @@ export default function SignPage() {
         router.push("/tablet");
       }, 2000);
     } catch (err: any) {
-      setError("Erreur lors de la sauvegarde locale.");
+      setError(err instanceof Error ? err.message : "Erreur lors de la sauvegarde locale.");
       setSaving(false);
     }
   };

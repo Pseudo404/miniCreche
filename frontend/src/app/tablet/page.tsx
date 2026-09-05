@@ -87,7 +87,7 @@ export default function TabletHome() {
         {employees.map((emp) => (
           <button
             key={emp.id}
-            onClick={() => router.push(`/tablet/sign/${emp.id}`)}
+            onClick={() => router.push(`/tablet/sign/__employee__?id=${encodeURIComponent(emp.id)}`)}
             className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md hover:border-blue-300 transition-all active:scale-95 flex flex-col items-center justify-center gap-3 aspect-square"
           >
             <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-2xl font-bold uppercase">

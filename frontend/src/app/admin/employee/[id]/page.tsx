@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import Link from "next/link";
 
@@ -88,8 +88,8 @@ function totalSlotMinutes(entry: ScheduleEntry): number {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function AdminEmployeeDetail() {
-  const params = useParams();
-  const id = params.id as string;
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id") || "";
 
   const [timeData, setTimeData] = useState<TimeData | null>(null);
   const [emargements, setEmargements] = useState<Emargement[]>([]);

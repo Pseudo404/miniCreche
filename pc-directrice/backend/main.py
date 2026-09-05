@@ -4,7 +4,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import List
+from typing import List, Dict, Tuple
 import database
 import json
 
@@ -77,6 +77,26 @@ def get_employees(creche: str = "", db: Session = Depends(database.get_db)):
 
 @app.post("/sync")
 def sync_emargements(emargements: List[EmargementSync], db: Session = Depends(database.get_db)):
+    # A tablet can work offline, so the server is the authoritative safeguard:
+    # no employee may have more than two events for a local calendar day.
+    pending_counts: Dict[Tuple[str, str], int] = {}
+    for e in emargements:
+        if db.query(database.Emargement).filter(database.Emargement.local_id == e.id).first():
+            continue
+        day = e.timestamp[:10]
+        key = (e.employee_id, day)
+        existing = db.query(database.Emargement).filter(
+            database.Emargement.employee_id == e.employee_id,
+            database.Emargement.timestamp.like(f"{day}%")
+        ).count()
+        received_before = pending_counts.get(key, 0)
+        if existing + received_before >= 2:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Limite de deux signatures atteinte pour {e.employee_name} le {day}."
+            )
+        pending_counts[key] = received_before + 1
+
     inserted_count = 0
     for e in emargements:
         # Check if already exists (idempotency)

@@ -16,6 +16,17 @@ export type EmargementRecord = {
 const SYNC_URL = process.env.NEXT_PUBLIC_SYNC_URL || "http://localhost:8000/sync";
 
 export async function saveEmargementLocally(record: Omit<EmargementRecord, 'id' | 'creche_name' | 'synced'>) {
+    const emargements: EmargementRecord[] = await get('emargements') || [];
+    const today = new Date().toLocaleDateString('en-CA');
+    const eventsToday = emargements.filter((event) =>
+        event.employee_id === record.employee_id &&
+        new Date(event.timestamp).toLocaleDateString('en-CA') === today
+    );
+
+    if (eventsToday.length >= 2) {
+        throw new Error("Cet employé a déjà effectué ses deux signatures aujourd'hui.");
+    }
+
     const creche = getCreche();
     const fullRecord: EmargementRecord = {
         ...record,
