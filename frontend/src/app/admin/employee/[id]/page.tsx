@@ -109,7 +109,7 @@ export default function AdminEmployeeDetail() {
   const [loading, setLoading] = useState(true);
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [year, setYear] = useState(new Date().getFullYear());
-  const [activeTab, setActiveTab] = useState<"time" | "signatures" | "schedule" | "exceptions">("time");
+  const [activeTab, setActiveTab] = useState<"time" | "signatures" | "schedule">("time");
 
   // Exceptions state
   const [exceptions, setExceptions] = useState<ScheduleExceptionEntry[]>([]);
@@ -131,7 +131,9 @@ export default function AdminEmployeeDetail() {
   // Balance adjustments state
   type BalAdj = { id: number; minutes: number; reason: string; created_at: string };
   const [adjustments, setAdjustments] = useState<BalAdj[]>([]);
-  const [adjMinutes, setAdjMinutes] = useState("");
+  const [adjHours, setAdjHours] = useState("");
+  const [adjMins, setAdjMins] = useState("");
+  const [adjIsNegative, setAdjIsNegative] = useState(false);
   const [adjReason, setAdjReason] = useState("");
   const [adjSaving, setAdjSaving] = useState(false);
 
@@ -298,19 +300,23 @@ export default function AdminEmployeeDetail() {
 
   const handleAddAdjustment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!adjMinutes) return;
+    const h = parseInt(adjHours) || 0;
+    const m = parseInt(adjMins) || 0;
+    if (h === 0 && m === 0) return;
+    let totalMins = h * 60 + m;
+    if (adjIsNegative) totalMins = -totalMins;
     setAdjSaving(true);
     try {
       await apiFetch(`/admin/employees/${id}/balance/adjust?creche=${encodeURIComponent(creche)}`, {
         method: "POST",
-        body: JSON.stringify({ minutes: parseInt(adjMinutes), reason: adjReason }),
+        body: JSON.stringify({ minutes: totalMins, reason: adjReason }),
       });
       // Refresh
       const data = await apiFetch(`/admin/employees/${id}/balance/adjustments?creche=${encodeURIComponent(creche)}`);
       setAdjustments(data);
       const timeRes = await apiFetch(`/admin/employees/${id}/time/?month=${month}&year=${year}${crecheQuery}`);
       setTimeData(timeRes);
-      setAdjMinutes(""); setAdjReason("");
+      setAdjHours(""); setAdjMins(""); setAdjReason("");
     } catch (err) {
       console.error(err);
       alert("Erreur lors de l'ajout de l'ajustement.");
@@ -409,9 +415,8 @@ export default function AdminEmployeeDetail() {
           [
             { key: "time", label: "Calcul des Heures" },
             { key: "schedule", label: "📅 Emploi du Temps" },
-            { key: "exceptions", label: "⭐ Jours Personnalisés" },
             { key: "signatures", label: "Contrôle des Signatures" },
-          ] as { key: "time" | "schedule" | "exceptions" | "signatures"; label: string }[]
+          ] as { key: "time" | "schedule" | "signatures"; label: string }[]
         ).map(({ key, label }) => (
           <button
             key={key}
@@ -612,12 +617,11 @@ export default function AdminEmployeeDetail() {
                   </div>
                 </>
               )}
-            </div>
-          )}
+              
+              {/* --- Jours Personnalisés / Exceptions --- */}
+              <div className="mt-8 border-t-2 border-slate-100 bg-slate-50">
 
-          {/* ── Jours Personnalisés ─────────────────────────────────────── */}
-          {activeTab === "exceptions" && (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden p-6">
+            <div className="p-6">
               <h2 className="text-xl font-bold text-slate-800 mb-4">Ajouter un jour personnalisé</h2>
               <form onSubmit={handleAddException} className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl mb-8 border border-slate-100">
                 <div>
@@ -702,7 +706,11 @@ export default function AdminEmployeeDetail() {
                 </div>
               )}
             </div>
+              </div>
+            </div>
           )}
+
+
 
           {/* ── Contrôle des Signatures ───────────────────────────────────── */}
           {activeTab === "signatures" && (
