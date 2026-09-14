@@ -128,6 +128,13 @@ export default function AdminEmployeeDetail() {
   const [scheduleSaving, setScheduleSaving] = useState(false);
   const [scheduleSaved, setScheduleSaved] = useState(false);
 
+  // Balance adjustments state
+  type BalAdj = { id: number; minutes: number; reason: string; created_at: string };
+  const [adjustments, setAdjustments] = useState<BalAdj[]>([]);
+  const [adjMinutes, setAdjMinutes] = useState("");
+  const [adjReason, setAdjReason] = useState("");
+  const [adjSaving, setAdjSaving] = useState(false);
+
   // ── Fetch time + signatures ──────────────────────────────────────────────
   useEffect(() => {
     const fetchData = async () => {
@@ -191,6 +198,19 @@ export default function AdminEmployeeDetail() {
       }
     };
     fetchExceptions();
+  }, [id, creche]);
+
+
+  useEffect(() => {
+    const fetchAdjustments = async () => {
+      try {
+        const data = await apiFetch(`/admin/employees/${id}/balance/adjustments?creche=${encodeURIComponent(creche)}`);
+        setAdjustments(data);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchAdjustments();
   }, [id, creche]);
 
   // ── Handlers ─────────────────────────────────────────────────────────────
@@ -268,6 +288,43 @@ export default function AdminEmployeeDetail() {
       });
       const data = await apiFetch(`/admin/employees/${id}/exceptions/?creche=${encodeURIComponent(creche)}`);
       setExceptions(data);
+      const timeRes = await apiFetch(`/admin/employees/${id}/time/?month=${month}&year=${year}${crecheQuery}`);
+      setTimeData(timeRes);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+
+  const handleAddAdjustment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adjMinutes) return;
+    setAdjSaving(true);
+    try {
+      await apiFetch(`/admin/employees/${id}/balance/adjust?creche=${encodeURIComponent(creche)}`, {
+        method: "POST",
+        body: JSON.stringify({ minutes: parseInt(adjMinutes), reason: adjReason }),
+      });
+      // Refresh
+      const data = await apiFetch(`/admin/employees/${id}/balance/adjustments?creche=${encodeURIComponent(creche)}`);
+      setAdjustments(data);
+      const timeRes = await apiFetch(`/admin/employees/${id}/time/?month=${month}&year=${year}${crecheQuery}`);
+      setTimeData(timeRes);
+      setAdjMinutes(""); setAdjReason("");
+    } catch (err) {
+      console.error(err);
+      alert("Erreur lors de l'ajout de l'ajustement.");
+    } finally {
+      setAdjSaving(false);
+    }
+  };
+
+  const handleDeleteAdjustment = async (adj_id: number) => {
+    if (!confirm("Supprimer cet ajustement ?")) return;
+    try {
+      await apiFetch(`/admin/employees/${id}/balance/adjustments/${adj_id}`, { method: "DELETE" });
+      const data = await apiFetch(`/admin/employees/${id}/balance/adjustments?creche=${encodeURIComponent(creche)}`);
+      setAdjustments(data);
       const timeRes = await apiFetch(`/admin/employees/${id}/time/?month=${month}&year=${year}${crecheQuery}`);
       setTimeData(timeRes);
     } catch (err) {
