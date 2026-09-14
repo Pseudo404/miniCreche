@@ -45,6 +45,17 @@ type ScheduleEntry = {
   aprem_fin: string;
 };
 
+type ScheduleExceptionEntry = {
+  date: string;
+  label: string;
+  matin_debut: string;
+  matin_fin: string;
+  aprem_debut: string;
+  aprem_fin: string;
+  no_pointage: boolean;
+  cumuler: boolean;
+};
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const JOURS = [
@@ -98,7 +109,18 @@ export default function AdminEmployeeDetail() {
   const [loading, setLoading] = useState(true);
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [year, setYear] = useState(new Date().getFullYear());
-  const [activeTab, setActiveTab] = useState<"time" | "signatures" | "schedule">("time");
+  const [activeTab, setActiveTab] = useState<"time" | "signatures" | "schedule" | "exceptions">("time");
+
+  // Exceptions state
+  const [exceptions, setExceptions] = useState<ScheduleExceptionEntry[]>([]);
+  const [exceptionsLoading, setExceptionsLoading] = useState(false);
+  const [newExcDate, setNewExcDate] = useState("");
+  const [newExcLabel, setNewExcLabel] = useState("Journée exceptionnelle");
+  const [newExcMatinDebut, setNewExcMatinDebut] = useState("");
+  const [newExcMatinFin, setNewExcMatinFin] = useState("");
+  const [newExcApremDebut, setNewExcApremDebut] = useState("");
+  const [newExcApremFin, setNewExcApremFin] = useState("");
+  const [newExcCumuler, setNewExcCumuler] = useState(false);
 
   // Schedule state
   const [schedule, setSchedule] = useState<ScheduleEntry[]>(EMPTY_SCHEDULE);
@@ -156,6 +178,21 @@ export default function AdminEmployeeDetail() {
     fetchSchedule();
   }, [id, creche]);
 
+  useEffect(() => {
+    const fetchExceptions = async () => {
+      setExceptionsLoading(true);
+      try {
+        const data = await apiFetch(`/admin/employees/${id}/exceptions/?creche=${encodeURIComponent(creche)}`);
+        setExceptions(data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setExceptionsLoading(false);
+      }
+    };
+    fetchExceptions();
+  }, [id, creche]);
+
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleMonthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const [y, m] = e.target.value.split("-");
@@ -182,7 +219,6 @@ export default function AdminEmployeeDetail() {
         body: JSON.stringify(schedule),
       });
       setScheduleSaved(true);
-      // Reload time data to reflect new contract minutes
       const timeRes = await apiFetch(
         `/admin/employees/${id}/time/?month=${month}&year=${year}${crecheQuery}`
       );
@@ -191,6 +227,51 @@ export default function AdminEmployeeDetail() {
       console.error(err);
     } finally {
       setScheduleSaving(false);
+    }
+  };
+
+  const handleAddException = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newExcDate) return;
+    try {
+      await apiFetch(`/admin/employees/${id}/exceptions/?creche=${encodeURIComponent(creche)}`, {
+        method: "POST",
+        body: JSON.stringify({
+          date: newExcDate,
+          label: newExcLabel,
+          matin_debut: newExcMatinDebut,
+          matin_fin: newExcMatinFin,
+          aprem_debut: newExcApremDebut,
+          aprem_fin: newExcApremFin,
+          no_pointage: false,
+          cumuler: newExcCumuler,
+        }),
+      });
+      // Refresh
+      const data = await apiFetch(`/admin/employees/${id}/exceptions/?creche=${encodeURIComponent(creche)}`);
+      setExceptions(data);
+      const timeRes = await apiFetch(`/admin/employees/${id}/time/?month=${month}&year=${year}${crecheQuery}`);
+      setTimeData(timeRes);
+      // Reset
+      setNewExcDate(""); setNewExcLabel("Journée exceptionnelle"); setNewExcMatinDebut(""); setNewExcMatinFin(""); setNewExcApremDebut(""); setNewExcApremFin(""); setNewExcCumuler(false);
+    } catch (err) {
+      console.error(err);
+      alert("Erreur lors de l&apos;ajout.");
+    }
+  };
+
+  const handleDeleteException = async (date: string) => {
+    if (!confirm("Supprimer cette journée personnalisée ?")) return;
+    try {
+      await apiFetch(`/admin/employees/${id}/exceptions/${date}?creche=${encodeURIComponent(creche)}`, {
+        method: "DELETE",
+      });
+      const data = await apiFetch(`/admin/employees/${id}/exceptions/?creche=${encodeURIComponent(creche)}`);
+      setExceptions(data);
+      const timeRes = await apiFetch(`/admin/employees/${id}/time/?month=${month}&year=${year}${crecheQuery}`);
+      setTimeData(timeRes);
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -271,8 +352,9 @@ export default function AdminEmployeeDetail() {
           [
             { key: "time", label: "Calcul des Heures" },
             { key: "schedule", label: "📅 Emploi du Temps" },
+            { key: "exceptions", label: "⭐ Jours Personnalisés" },
             { key: "signatures", label: "Contrôle des Signatures" },
-          ] as { key: "time" | "schedule" | "signatures"; label: string }[]
+          ] as { key: "time" | "schedule" | "exceptions" | "signatures"; label: string }[]
         ).map(({ key, label }) => (
           <button
             key={key}
@@ -472,6 +554,95 @@ export default function AdminEmployeeDetail() {
                     </table>
                   </div>
                 </>
+              )}
+            </div>
+          )}
+
+          {/* ── Jours Personnalisés ─────────────────────────────────────── */}
+          {activeTab === "exceptions" && (
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden p-6">
+              <h2 className="text-xl font-bold text-slate-800 mb-4">Ajouter un jour personnalisé</h2>
+              <form onSubmit={handleAddException} className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl mb-8 border border-slate-100">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
+                  <input type="date" required value={newExcDate} onChange={e => setNewExcDate(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Libellé (ex: Réunion, Formation)</label>
+                  <input type="text" value={newExcLabel} onChange={e => setNewExcLabel(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Matin – Début</label>
+                  <input type="time" value={newExcMatinDebut} onChange={e => setNewExcMatinDebut(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Matin – Fin</label>
+                  <input type="time" value={newExcMatinFin} onChange={e => setNewExcMatinFin(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Après-midi – Début</label>
+                  <input type="time" value={newExcApremDebut} onChange={e => setNewExcApremDebut(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Après-midi – Fin</label>
+                  <input type="time" value={newExcApremFin} onChange={e => setNewExcApremFin(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+                </div>
+                <div className="md:col-span-2 flex items-center mt-2">
+                  <input type="checkbox" id="cumuler" checked={newExcCumuler} onChange={e => setNewExcCumuler(e.target.checked)} className="w-5 h-5 text-purple-600 border-slate-300 rounded focus:ring-purple-500 mr-3" />
+                  <label htmlFor="cumuler" className="text-sm font-medium text-slate-800">
+                    Cumuler avec l&apos;horaire habituel (utile pour les réunions en soirée). Si non coché, remplace complètement la journée.
+                  </label>
+                </div>
+                <div className="md:col-span-2 mt-2">
+                  <button type="submit" className="px-6 py-2 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition-colors">
+                    Ajouter
+                  </button>
+                </div>
+              </form>
+
+              <h2 className="text-xl font-bold text-slate-800 mb-4">Jours personnalisés enregistrés</h2>
+              {exceptionsLoading ? (
+                <div className="text-slate-500">Chargement...</div>
+              ) : exceptions.length === 0 ? (
+                <div className="text-slate-500">Aucun jour personnalisé.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-xs font-semibold">
+                        <th className="px-4 py-3">Date</th>
+                        <th className="px-4 py-3">Libellé</th>
+                        <th className="px-4 py-3">Horaires</th>
+                        <th className="px-4 py-3">Mode</th>
+                        <th className="px-4 py-3 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {exceptions.map(exc => (
+                        <tr key={exc.date} className="hover:bg-slate-50">
+                          <td className="px-4 py-3 font-medium text-slate-800">{new Date(exc.date).toLocaleDateString("fr-FR")}</td>
+                          <td className="px-4 py-3 text-slate-600">{exc.label}</td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {exc.matin_debut && exc.matin_fin ? `${exc.matin_debut}-${exc.matin_fin} ` : ""}
+                            {exc.aprem_debut && exc.aprem_fin ? `${exc.aprem_debut}-${exc.aprem_fin}` : ""}
+                          </td>
+                          <td className="px-4 py-3">
+                            {exc.cumuler ? (
+                              <span className="text-xs font-bold text-purple-700 bg-purple-100 px-2 py-1 rounded">Cumulé</span>
+                            ) : (
+                              <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded">Remplacement</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button onClick={() => handleDeleteException(exc.date)} className="text-rose-600 hover:text-rose-800 font-semibold text-xs bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded transition-colors">
+                              Supprimer
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           )}
