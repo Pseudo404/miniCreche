@@ -513,6 +513,85 @@ export default function AdminEmployeeDetail() {
                 </tbody>
               </table>
             </div>
+            
+            {/* --- Adjustments Section --- */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mt-6">
+              <h3 className="text-lg font-bold text-slate-800 mb-4">Ajustement manuel du solde (Heures supplémentaires / Négatives)</h3>
+              
+              <form onSubmit={handleAddAdjustment} className="flex flex-col sm:flex-row gap-3 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-100 items-end">
+                <div className="flex flex-row gap-2 items-end">
+                  <div className="w-32">
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Action</label>
+                    <select value={adjIsNegative ? "minus" : "plus"} onChange={e => setAdjIsNegative(e.target.value === "minus")} className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white">
+                      <option value="plus">Ajouter (+)</option>
+                      <option value="minus">Retirer (-)</option>
+                    </select>
+                  </div>
+                  <div className="w-24">
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Heures</label>
+                    <input type="number" min="0" placeholder="ex: 2" value={adjHours} onChange={e => setAdjHours(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+                  </div>
+                  <div className="w-24">
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Minutes</label>
+                    <input type="number" min="0" max="59" placeholder="ex: 30" value={adjMins} onChange={e => setAdjMins(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+                  </div>
+                </div>
+                <div className="flex-1 w-full">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Motif (optionnel)</label>
+                  <input type="text" placeholder="ex: Régularisation d'heures négatives" value={adjReason} onChange={e => setAdjReason(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+                </div>
+                <button type="submit" disabled={adjSaving} className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors h-[42px]">
+                  {adjSaving ? "..." : "Valider"}
+                </button>
+                <button type="button" onClick={async () => {
+                  if (!confirm("Attention, cela va supprimer tout l'historique d'ajustements de cet employé. Continuer ?")) return;
+                  setAdjSaving(true);
+                  try {
+                    await apiFetch(`/admin/employees/${id}/balance/adjust?creche=${encodeURIComponent(creche)}`, {
+                      method: "POST",
+                      body: JSON.stringify({ minutes: 0, reason: "Reset" }),
+                    });
+                    const data = await apiFetch(`/admin/employees/${id}/balance/adjustments?creche=${encodeURIComponent(creche)}`);
+                    setAdjustments(data);
+                    const timeRes = await apiFetch(`/admin/employees/${id}/time/?month=${month}&year=${year}${crecheQuery}`);
+                    setTimeData(timeRes);
+                  } catch (err) { console.error(err); } finally { setAdjSaving(false); }
+                }} className="px-4 py-2 bg-rose-100 text-rose-700 font-semibold rounded-lg hover:bg-rose-200 transition-colors h-[42px]" title="Remet le compteur à zéro en supprimant tous les ajustements">
+                  Tout Effacer
+                </button>
+              </form>
+
+              {adjustments.length > 0 && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-xs font-semibold">
+                        <th className="px-4 py-2">Date</th>
+                        <th className="px-4 py-2">Ajustement</th>
+                        <th className="px-4 py-2">Motif</th>
+                        <th className="px-4 py-2 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {adjustments.map(adj => (
+                        <tr key={adj.id} className="hover:bg-slate-50">
+                          <td className="px-4 py-2 text-slate-600">{new Date(adj.created_at).toLocaleDateString("fr-FR")}</td>
+                          <td className="px-4 py-2 font-bold">
+                            <span className={adj.minutes >= 0 ? "text-emerald-600" : "text-rose-600"}>
+                              {adj.minutes > 0 ? "+" : ""}{adj.minutes} min ({formatMinutes(Math.abs(adj.minutes))})
+                            </span>
+                          </td>
+                          <td className="px-4 py-2 text-slate-600">{adj.reason}</td>
+                          <td className="px-4 py-2 text-right">
+                            <button onClick={() => handleDeleteAdjustment(adj.id)} className="text-rose-600 hover:text-rose-800 text-xs">Supprimer</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           )}
 
           {/* ── Emploi du Temps ───────────────────────────────────────────── */}
